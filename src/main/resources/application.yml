@@ -12,6 +12,12 @@ spring:
 server:
   port: ${PORT:8080}
 
+app:
+  security:
+    jwt-secret: ${JWT_SECRET:dev-only-jwt-secret-change-me-in-production-0123456789}
+    admin-secret: ${ADMIN_SECRET:dev-admin-secret}
+    token-ttl-minutes: ${JWT_TTL_MINUTES:720}
+
 management:
   endpoints:
     web:
