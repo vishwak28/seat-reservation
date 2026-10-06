@@ -1,6 +1,7 @@
 package com.seatreservation.service;
 
 import com.seatreservation.dto.ReservationResponse;
+import com.seatreservation.model.Reservation;
 import com.seatreservation.model.Show;
 import com.seatreservation.repository.ReservationRepository;
 import com.seatreservation.repository.ShowRepository;
@@ -13,12 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class ReservationService {
@@ -44,13 +40,14 @@ public class ReservationService {
         long amountPaise = Math.multiplyExact(show.getPricePaise(), (long) seats.size());
         String requestHash = hash(showId, seats);
 
-        UUID reservationId;
-        try {
-            reservationId = reservationRepository.insertReservation(
-                    showId, userId, amountPaise, idempotencyKey, requestHash);
-        } catch (DuplicateKeyException e) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency key already used");
+        Optional<UUID> inserted = reservationRepository.insertReservationIfAbsent(
+                showId, userId, amountPaise, idempotencyKey, requestHash);
+
+        if (inserted.isEmpty()) {
+            return replayOrReject(userId, idempotencyKey, requestHash, seats);
         }
+
+        UUID reservationId = inserted.get();
 
         for (String seatNo : seats) {
             if (!reservationRepository.claimSeat(showId, seatNo, reservationId)) {
@@ -86,5 +83,20 @@ public class ReservationService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }
+    }
+
+    private ReservationResponse replayOrReject(String userId, String idempotencyKey,
+                                               String requestHash, List<String> seats) {
+        Reservation existing = reservationRepository.findByUserAndKey(userId, idempotencyKey)
+                .orElseThrow(() -> new IllegalStateException("Idempotency record vanished"));
+
+        if (!existing.getRequestHash().equals(requestHash)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Idempotency key was already used with a different request");
+        }
+
+        return new ReservationResponse(
+                existing.getId(), existing.getShowId(), existing.getUserId(),
+                seats, existing.getAmountPaise(), existing.getStatus().toLowerCase(Locale.ROOT));
     }
 }
