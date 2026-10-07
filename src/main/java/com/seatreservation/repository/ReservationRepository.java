@@ -87,4 +87,64 @@ public class ReservationRepository {
                 showId, userId, seatCount, limit);
         return !rows.isEmpty();
     }
+
+    /**
+     * Cancels the reservation if it is CONFIRMED and owned by this user. Returns its show id.
+     */
+    public Optional<UUID> markCancelled(UUID reservationId, String userId) {
+        List<UUID> rows = jdbc.query("""
+                        UPDATE reservations
+                           SET status = 'CANCELLED', cancelled_at = now()
+                         WHERE id = ? AND user_id = ? AND status = 'CONFIRMED'
+                        RETURNING show_id
+                        """,
+                (rs, rowNum) -> rs.getObject("show_id", UUID.class),
+                reservationId, userId);
+        return rows.stream().findFirst();
+    }
+
+    public Optional<Reservation> findById(UUID reservationId) {
+        List<Reservation> rows = jdbc.query("""
+                        SELECT id, show_id, user_id, amount_paise, status, request_hash
+                        FROM reservations
+                        WHERE id = ?
+                        """,
+                (rs, rowNum) -> new Reservation(
+                        rs.getObject("id", UUID.class),
+                        rs.getObject("show_id", UUID.class),
+                        rs.getString("user_id"),
+                        rs.getLong("amount_paise"),
+                        rs.getString("status"),
+                        rs.getString("request_hash")),
+                reservationId);
+        return rows.stream().findFirst();
+    }
+
+    public int countSeats(UUID reservationId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM seats WHERE reservation_id = ?", Integer.class, reservationId);
+        return count == null ? 0 : count;
+    }
+
+    public void decreaseUserHolds(UUID showId, String userId, int seatCount) {
+        int rows = jdbc.update("""
+                UPDATE user_show_holds
+                   SET seat_count = seat_count - ?
+                 WHERE show_id = ? AND user_id = ?
+                """, seatCount, showId, userId);
+        if (rows != 1) {
+            throw new IllegalStateException("User holds counter missing for " + userId);
+        }
+    }
+
+    /**
+     * Releases only the seats owned by this reservation.
+     */
+    public int releaseSeats(UUID reservationId) {
+        return jdbc.update("""
+                UPDATE seats
+                   SET status = 'AVAILABLE', reservation_id = NULL
+                 WHERE reservation_id = ?
+                """, reservationId);
+    }
 }

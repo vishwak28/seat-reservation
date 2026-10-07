@@ -1,5 +1,6 @@
 package com.seatreservation.service;
 
+import com.seatreservation.dto.CancelResponse;
 import com.seatreservation.dto.ReservationResponse;
 import com.seatreservation.exception.DeclineReason;
 import com.seatreservation.exception.ReservationDeclinedException;
@@ -111,5 +112,32 @@ public class ReservationService {
         return new ReservationResponse(
                 existing.getId(), existing.getShowId(), existing.getUserId(),
                 seats, existing.getAmountPaise(), existing.getStatus().toLowerCase(Locale.ROOT));
+    }
+
+    @Transactional
+    public CancelResponse cancel(UUID reservationId, String userId) {
+        Optional<UUID> cancelledShow = reservationRepository.markCancelled(reservationId, userId);
+
+        if (cancelledShow.isEmpty()) {
+            Reservation existing = reservationRepository.findById(reservationId)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND, "Reservation not found"));
+            if (!existing.getUserId().equals(userId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your reservation");
+            }
+            // Owner, and it was already cancelled: cancel is idempotent.
+            return new CancelResponse(existing.getId(), existing.getShowId(), "cancelled", 0);
+        }
+
+        UUID showId = cancelledShow.get();
+        int seatCount = reservationRepository.countSeats(reservationId);
+        reservationRepository.decreaseUserHolds(showId, userId, seatCount);
+        int released = reservationRepository.releaseSeats(reservationId);
+
+        if (released != seatCount) {
+            throw new IllegalStateException("Released " + released + " seats but expected " + seatCount);
+        }
+
+        return new CancelResponse(reservationId, showId, "cancelled", released);
     }
 }
