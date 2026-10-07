@@ -2,10 +2,12 @@ package com.seatreservation.controller;
 
 import com.seatreservation.dto.ReservationResponse;
 import com.seatreservation.dto.ReserveRequest;
+import com.seatreservation.metrics.ReservationMetrics;
 import com.seatreservation.security.AuthenticatedUser;
 import com.seatreservation.service.ReservationService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,21 +25,32 @@ import java.util.UUID;
 public class ReservationController {
 
     private final ReservationService service;
+    private final ReservationMetrics metrics;
 
-    public ReservationController(ReservationService service) {
+    public ReservationController(ReservationService service, ReservationMetrics metrics) {
         this.service = service;
+        this.metrics = metrics;
     }
 
     @PostMapping("/{showId}/reserve")
-    @ResponseStatus(HttpStatus.CREATED)
-    public ReservationResponse reserve(
+    public ResponseEntity<ReservationResponse> reserve(
             @PathVariable UUID showId,
             @AuthenticationPrincipal AuthenticatedUser user,
             @RequestHeader(name = "Idempotency-Key", required = false) String headerKey,
             @Valid @RequestBody ReserveRequest request) {
 
         String key = resolveKey(headerKey, request.getIdempotencyKey());
-        return service.reserve(showId, user.getUserId(), request.getSeats(), key);
+        ReservationResponse response =
+                service.reserve(showId, user.getUserId(), request.getSeats(), key);
+
+        ResponseEntity.BodyBuilder result = ResponseEntity.status(HttpStatus.CREATED);
+        if (response.isReplayed()) {
+            metrics.declined(ReservationMetrics.IDEMPOTENT_REPLAY);
+            result.header("Idempotent-Replayed", "true");
+        } else {
+            metrics.confirmed();
+        }
+        return result.body(response);
     }
 
     private String resolveKey(String headerKey, String bodyKey) {

@@ -1,5 +1,6 @@
 package com.seatreservation.exception;
 
+import com.seatreservation.metrics.ReservationMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -19,11 +20,19 @@ import java.util.Locale;
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private final ReservationMetrics metrics;
+
+    public GlobalExceptionHandler(ReservationMetrics metrics) {
+        this.metrics = metrics;
+    }
 
     @ExceptionHandler(ReservationDeclinedException.class)
     public ProblemDetail handleDeclined(ReservationDeclinedException ex) {
+        String reason = ex.getDeclineReason().name().toLowerCase(Locale.ROOT);
+        metrics.declined(reason);
+
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getReason());
-        problem.setProperty("reason", ex.getDeclineReason().name().toLowerCase(Locale.ROOT));
+        problem.setProperty("reason", reason);
         return problem;
     }
 

@@ -1,5 +1,6 @@
 package com.seatreservation.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
@@ -23,14 +24,24 @@ public class ReservationResponse {
 
     private final String status;
 
+    @JsonIgnore
+    private final boolean replayed;
+
     public ReservationResponse(UUID reservationId, UUID showId, String userId,
                                List<String> seats, long amountPaise, String status) {
+        this(reservationId, showId, userId, seats, amountPaise, status, false);
+    }
+
+    public ReservationResponse(UUID reservationId, UUID showId, String userId,
+                               List<String> seats, long amountPaise, String status,
+                               boolean replayed) {
         this.reservationId = reservationId;
         this.showId = showId;
         this.userId = userId;
         this.seats = seats;
         this.amountPaise = amountPaise;
         this.status = status;
+        this.replayed = replayed;
     }
 
     public UUID getReservationId() {
@@ -55,5 +66,9 @@ public class ReservationResponse {
 
     public String getStatus() {
         return status;
+    }
+
+    public boolean isReplayed() {
+        return replayed;
     }
 }

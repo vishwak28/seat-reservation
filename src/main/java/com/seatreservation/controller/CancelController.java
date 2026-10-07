@@ -1,6 +1,7 @@
 package com.seatreservation.controller;
 
 import com.seatreservation.dto.CancelResponse;
+import com.seatreservation.metrics.ReservationMetrics;
 import com.seatreservation.security.AuthenticatedUser;
 import com.seatreservation.service.ReservationService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,14 +17,20 @@ import java.util.UUID;
 public class CancelController {
 
     private final ReservationService service;
+    private final ReservationMetrics metrics;
 
-    public CancelController(ReservationService service) {
+    public CancelController(ReservationService service, ReservationMetrics metrics) {
         this.service = service;
+        this.metrics = metrics;
     }
 
     @PostMapping("/{reservationId}/cancel")
     public CancelResponse cancel(@PathVariable UUID reservationId,
                                  @AuthenticationPrincipal AuthenticatedUser user) {
-        return service.cancel(reservationId, user.getUserId());
+        CancelResponse response = service.cancel(reservationId, user.getUserId());
+        if (response.getSeatsReleased() > 0) {
+            metrics.cancelled();
+        }
+        return response;
     }
 }
