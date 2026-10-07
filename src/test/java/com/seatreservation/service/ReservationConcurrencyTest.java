@@ -33,6 +33,7 @@ class ReservationConcurrencyTest {
     @Test
     void hotSeatHasExactlyOneWinner() throws Exception {
         UUID showId = createShow(List.of("A12", "A13"));
+        String runId = UUID.randomUUID().toString();
         int contenders = 100;
 
         ExecutorService pool = Executors.newFixedThreadPool(contenders);
@@ -48,7 +49,7 @@ class ReservationConcurrencyTest {
                 ready.countDown();
                 try {
                     start.await();
-                    reservationService.reserve(showId, "user-" + n, List.of("A12"), "key-" + n);
+                    reservationService.reserve(showId, "user-" + n, List.of("A12"), "key-" + runId + "-" + n);
                     winners.incrementAndGet();
                 } catch (ResponseStatusException e) {
                     if (e.getStatusCode().value() == 409) {
