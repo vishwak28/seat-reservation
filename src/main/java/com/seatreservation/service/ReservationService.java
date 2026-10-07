@@ -41,6 +41,12 @@ public class ReservationService {
 
         long amountPaise = Math.multiplyExact(show.getPricePaise(), (long) seats.size());
         String requestHash = hash(showId, seats);
+        int limit = show.getPerUserLimit();
+
+        if (seats.size() > limit) {
+            throw new ReservationDeclinedException(DeclineReason.PER_USER_LIMIT,
+                    "A single request cannot exceed the limit of " + limit + " seats per show");
+        }
 
         Optional<UUID> inserted = reservationRepository.insertReservationIfAbsent(
                 showId, userId, amountPaise, idempotencyKey, requestHash);
@@ -50,6 +56,11 @@ public class ReservationService {
         }
 
         UUID reservationId = inserted.get();
+
+        if (!reservationRepository.tryIncreaseUserHolds(showId, userId, seats.size(), limit)) {
+            throw new ReservationDeclinedException(DeclineReason.PER_USER_LIMIT,
+                    "Per-user limit of " + limit + " seats reached for this show");
+        }
 
         for (String seatNo : seats) {
             if (!reservationRepository.claimSeat(showId, seatNo, reservationId)) {

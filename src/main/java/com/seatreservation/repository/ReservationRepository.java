@@ -69,4 +69,22 @@ public class ReservationRepository {
                 Integer.class, showId, seatNo);
         return count != null && count > 0;
     }
+
+    /**
+     * Atomically adds seatCount to the user's total for this show,
+     * but only if the new total stays within the limit.
+     */
+    public boolean tryIncreaseUserHolds(UUID showId, String userId, int seatCount, int limit) {
+        List<Integer> rows = jdbc.query("""
+                        INSERT INTO user_show_holds (show_id, user_id, seat_count)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT (show_id, user_id)
+                        DO UPDATE SET seat_count = user_show_holds.seat_count + EXCLUDED.seat_count
+                        WHERE user_show_holds.seat_count + EXCLUDED.seat_count <= ?
+                        RETURNING seat_count
+                        """,
+                (rs, rowNum) -> rs.getInt("seat_count"),
+                showId, userId, seatCount, limit);
+        return !rows.isEmpty();
+    }
 }
