@@ -4,6 +4,7 @@ import com.seatreservation.model.Seat;
 import com.seatreservation.model.Show;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+
 import java.util.Optional;
 
 import java.util.List;
@@ -39,10 +40,10 @@ public class ShowRepository {
 
     public Optional<Show> findById(UUID id) {
         List<Show> rows = jdbc.query("""
-                SELECT id, name, price_paise, per_user_limit, total_seats
-                FROM shows
-                WHERE id = ?
-                """,
+                        SELECT id, name, price_paise, per_user_limit, total_seats
+                        FROM shows
+                        WHERE id = ?
+                        """,
                 (rs, rowNum) -> new Show(
                         rs.getObject("id", UUID.class),
                         rs.getString("name"),
@@ -55,12 +56,18 @@ public class ShowRepository {
 
     public List<Seat> findSeats(UUID showId) {
         return jdbc.query("""
-                SELECT seat_no, status
-                FROM seats
-                WHERE show_id = ?
-                ORDER BY seat_no
-                """,
+                        SELECT seat_no, status
+                        FROM seats
+                        WHERE show_id = ?
+                        ORDER BY seat_no
+                        """,
                 (rs, rowNum) -> new Seat(rs.getString("seat_no"), rs.getString("status")),
                 showId);
+    }
+
+    public int countSeatsWithStatus(String status) {
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM seats WHERE status = ?", Integer.class, status);
+        return count == null ? 0 : count;
     }
 }
