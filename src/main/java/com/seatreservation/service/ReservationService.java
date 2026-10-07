@@ -1,6 +1,8 @@
 package com.seatreservation.service;
 
 import com.seatreservation.dto.ReservationResponse;
+import com.seatreservation.exception.DeclineReason;
+import com.seatreservation.exception.ReservationDeclinedException;
 import com.seatreservation.model.Reservation;
 import com.seatreservation.model.Show;
 import com.seatreservation.repository.ReservationRepository;
@@ -55,7 +57,7 @@ public class ReservationService {
                     throw new ResponseStatusException(HttpStatus.NOT_FOUND,
                             "Seat " + seatNo + " does not exist in this show");
                 }
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                throw new ReservationDeclinedException(DeclineReason.SEAT_TAKEN,
                         "Seat " + seatNo + " is not available");
             }
         }
@@ -91,7 +93,7 @@ public class ReservationService {
                 .orElseThrow(() -> new IllegalStateException("Idempotency record vanished"));
 
         if (!existing.getRequestHash().equals(requestHash)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
+            throw new ReservationDeclinedException(DeclineReason.KEY_REUSED,
                     "Idempotency key was already used with a different request");
         }
 
