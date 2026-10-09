@@ -6,6 +6,8 @@ import com.seatreservation.metrics.ReservationMetrics;
 import com.seatreservation.security.AuthenticatedUser;
 import com.seatreservation.service.ReservationService;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,6 +28,7 @@ public class ReservationController {
 
     private final ReservationService service;
     private final ReservationMetrics metrics;
+    private static final Logger log = LoggerFactory.getLogger(ReservationController.class);
 
     public ReservationController(ReservationService service, ReservationMetrics metrics) {
         this.service = service;
@@ -47,8 +50,13 @@ public class ReservationController {
         if (response.isReplayed()) {
             metrics.declined(ReservationMetrics.IDEMPOTENT_REPLAY);
             result.header("Idempotent-Replayed", "true");
+            log.info("Reservation replayed reservation_id={} show_id={}",
+                    response.getReservationId(), response.getShowId());
         } else {
             metrics.confirmed();
+            log.info("Reservation confirmed reservation_id={} show_id={} seats={} amount_paise={}",
+                    response.getReservationId(), response.getShowId(),
+                    response.getSeats(), response.getAmountPaise());
         }
         return result.body(response);
     }

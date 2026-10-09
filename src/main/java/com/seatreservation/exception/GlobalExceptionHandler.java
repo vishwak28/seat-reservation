@@ -30,6 +30,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail handleDeclined(ReservationDeclinedException ex) {
         String reason = ex.getDeclineReason().name().toLowerCase(Locale.ROOT);
         metrics.declined(reason);
+        log.info("Reservation declined reason={} detail={}", reason, ex.getReason());
 
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getReason());
         problem.setProperty("reason", reason);

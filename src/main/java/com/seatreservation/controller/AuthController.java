@@ -6,6 +6,8 @@ import com.seatreservation.dto.UserResponse;
 import com.seatreservation.security.AuthenticatedUser;
 import com.seatreservation.service.AuthService;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     public AuthController(AuthService authService) {
         this.authService = authService;
@@ -21,7 +24,9 @@ public class AuthController {
 
     @PostMapping("/token")
     public TokenResponse token(@Valid @RequestBody TokenRequest request) {
-        return authService.issueToken(request);
+        TokenResponse response = authService.issueToken(request);
+        log.info("Token issued for user_id={} role={}", response.getUserId(), response.getRole());
+        return response;
     }
 
     @GetMapping("/me")
